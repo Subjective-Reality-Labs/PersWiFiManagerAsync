@@ -1,12 +1,12 @@
 #######################################
-# Syntax Coloring Map For PersWiFiManager Library
+# Syntax Coloring Map For PersWiFiManagerAsync Library
 #######################################
 
 #######################################
 # Datatypes (KEYWORD1)
 #######################################
 
-PersWiFiManager	KEYWORD1
+PersWiFiManagerAsync	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)

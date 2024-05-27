@@ -69,7 +69,8 @@ pers_connection_t PersWiFiManagerAsync::attemptConnection(const String &ssid, co
       }
     } else {
       if ((getSsid() == "") && (WiFi.status() != WL_CONNECTED)) { // No saved credentials, so skip trying to connect
-        Serial.println("[PWMA] No saved credentials");
+        Serial.println("[PWMA] No saved credentials. Starting AP");
+        startApMode();
         _connectionStatus = P_DISCONNECTED;
         return P_DISCONNECTED;
       } else {
@@ -86,13 +87,13 @@ pers_connection_t PersWiFiManagerAsync::attemptConnection(const String &ssid, co
     return P_CONNECTING;
   } else {
     if (millis() - _connectStartTime > (10000) && WiFi.status() != WL_CONNECTED) {
-      if (!(WiFi.getMode() & WIFI_AP)) {
+      // if (!(WiFi.getMode() & WIFI_AP)) {
         Serial.println("[PWMA] Failed to connect. Starting AP");
         WiFi.mode(WIFI_AP);
         startApMode();
-      } else {
-        WiFi.mode(WIFI_AP); // Remove Station Mode if connecting to router failed
-      }
+      // } else {
+        // WiFi.mode(WIFI_AP); // Remove Station Mode if connecting to router failed
+      // }
       _connectSuccessTime = 0;
       _connectStartTime = 0;
       _connectRetryTime = millis();
@@ -117,9 +118,7 @@ void PersWiFiManagerAsync::handleWiFi()
 {
   // If AP mode and no client connected, close AP mode if the ESP has connected to the router or if time is up
   if ((WiFi.getMode() & WIFI_AP)) { 
-    if ((WiFi.softAPgetStationNum() == 0)
-      && (WiFi.status() == WL_CONNECTED) 
-      && (millis() - _apModeStartMillis > _apModeTimeoutMillis)
+    if (((WiFi.softAPgetStationNum() == 0) && (WiFi.status() == WL_CONNECTED) && (millis() - _apModeStartMillis > _apModeTimeoutMillis))
       || (_forceCloseAP && _connectSuccessTime && millis() - _connectSuccessTime > AP_FORCE_CLOSE_TIMEOUT)) 
     {
       Serial.println("[PWMA] Closing AP");
@@ -127,7 +126,7 @@ void PersWiFiManagerAsync::handleWiFi()
     }
   }
 
-  if (!_connectStartTime) {
+  if (_connectStartTime) {
     if (_connectRetryTime) {
       if (WiFi.status() != WL_CONNECTED && _apActive && !(getSsid() == "") && (millis() - _connectRetryTime > WIFI_RECONNECT_TIMEOUT)) {
         Serial.println("[PWMA] Retrying connection");
