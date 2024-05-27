@@ -1,32 +1,39 @@
-#ifndef PERSWIFIMANAGER_H
-#define PERSWIFIMANAGER_H
+#ifndef PERSWIFIMANAGERASYNC_H
+#define PERSWIFIMANAGERASYNC_H
 
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
 #elif defined(ESP32)
 #include <WiFi.h>
-#include <WebServer.h>
 #else
 #error "Unknown board class"
 #endif
+#include <ESPAsyncWebServer.h>
 #include <DNSServer.h>
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
 
-//#define WIFI_CONNECT_TIMEOUT 30
+#define WIFI_CONNECT_TIMEOUT 10000
+#define WIFI_RECONNECT_TIMEOUT 60000
+#define AP_FORCE_CLOSE_TIMEOUT 10000
 
-class PersWiFiManager {
+typedef enum {
+  P_DISCONNECTED  = 0,
+  P_CONNECTED     = 1,
+  P_CONNECTING    = 2,
+  P_SUCCESS       = 3,
+  P_FAILED        = 4,
+} pers_connection_t;
+
+class PersWiFiManagerAsync {
 
   public:
 
     typedef std::function<void(void)> WiFiChangeHandlerFunction;
 
-#if defined(ESP8266)
-    PersWiFiManager(ESP8266WebServer& s, DNSServer& d);
-#elif defined(ESP32)
-    PersWiFiManager(WebServer& s, DNSServer& d);
-#endif
+    PersWiFiManagerAsync(AsyncWebServer& s, DNSServer& d);
 
-    bool attemptConnection(const String& ssid = "", const String& pass = "");
+    pers_connection_t attemptConnection(const String& ssid = "", const String& pass = "");
 
     void setupWiFiHandlers();
 
@@ -40,9 +47,7 @@ class PersWiFiManager {
 
     String getSsid();
 
-    void setApCredentials(const String& apSsid, const String& apPass = "");
-
-    void setConnectNonBlock(bool b);
+    void setAp(const String& apSsid, const String& apPass = "", bool forceCloseAP = false);
 
     void handleWiFi();
 
@@ -57,28 +62,31 @@ class PersWiFiManager {
     void onApClose(WiFiChangeHandlerFunction fn);
 
   private:
-#if defined(ESP8266)
-    ESP8266WebServer * _server;
-#elif defined(ESP32)
-    WebServer * _server;
-#endif
+    AsyncWebServer * _server;
     DNSServer * _dnsServer;
     String _apSsid, _apPass;
 
-    bool _connectNonBlock;
     unsigned long _connectStartTime;
+    unsigned long _connectRetryTime;
+    unsigned long _connectSuccessTime;
+
     bool _freshConnectionAttempt;
+    bool _apActive;
+    bool _scanEnded;
+    bool _forceCloseAP;
+    pers_connection_t _connectionStatus;
 
     WiFiChangeHandlerFunction _connectHandler;
     WiFiChangeHandlerFunction _apHandler;
     WiFiChangeHandlerFunction _apCloseHandler;
 
-    String buildReport();
+    void _buildReport(pers_connection_t, Print&);
 
     void sendNoCacheHeaders();
 
     time_t _apModeTimeoutMillis;
     time_t _apModeStartMillis;
+
 };//class
 
 #endif
