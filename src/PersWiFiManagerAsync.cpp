@@ -18,8 +18,8 @@ const char wifi_htm[] PROGMEM = R"=====(
 
 #ifndef PWMA_LOG_DISABLE
 #define PWMA_LOG_PREFIX(m) #m
-#define PWMA_LOG(m) Serial.println(F("[PWMA] " m))
-#define PWMA_LOGF(m, v) Serial.printf(F(PWMA_LOG_PREFIX([PWMA] m %u)), v)
+#define PWMA_LOG(m) Serial.println("[PWMA] " m)
+#define PWMA_LOGF(m, v) Serial.printf(PWMA_LOG_PREFIX([PWMA] m %u\n), v)
 #else
 #define PWMA_LOG(m)
 #define PWMA_LOGF(m, v)
@@ -185,7 +185,12 @@ void PersWiFiManagerAsync::startApMode()
 {
   if (!_apActive) {
     IPAddress apIP(192, 168, 4, 1);
-    WiFi.mode(wifi_mode_t(WiFi.getMode() | WIFI_AP)); // Add AP Mode
+    if (_connectionStatus == P_DISCONNECTED || _connectionStatus == P_FAILED) {
+      WiFi.mode(WIFI_AP); // Set AP Mode
+    } else {
+      WiFi.mode(wifi_mode_t(WiFi.getMode() | WIFI_AP)); // Add AP Mode
+    }
+    
     WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
     _apPass.length() ? WiFi.softAP(getApSsid().c_str(), _apPass.c_str()) : WiFi.softAP(getApSsid().c_str());
     if (_apHandler)
@@ -252,7 +257,7 @@ void PersWiFiManagerAsync::setupWiFiHandlers()
     if(n == -2) {
       WiFi.scanNetworks(true);
       _scanEnded = false;
-    } else if (n) {
+    } else if (n >= 0) {
         // build array of indices
       int ix[n];
       for (int i = 0; i < n; i++)
@@ -284,10 +289,8 @@ void PersWiFiManagerAsync::setupWiFiHandlers()
 #endif
         }
       }
-
       // send string to client
       AsyncWebServerResponse *_response = _request->beginResponse(200, "text/plain", s);
-      // _response->addHeader("Access-Control-Allow-Origin", "*");
       _request->send(_response); 
       _scanEnded = true;
       }}); //_server->on /wifi/list
@@ -297,10 +300,15 @@ void PersWiFiManagerAsync::setupWiFiHandlers()
     String pwd =  _request->arg("p");
     // pers_connection_t connect = attemptConnection(_request->arg("n"), _request->arg("p"));
     pers_connection_t connect = attemptConnection(ssid, pwd);
-    PWMA_LOGF(Connect:, connect);
-    // Serial.print("[PWMA] Connect:");
-    // Serial.println(connect);
+    PWMA_LOGF(Connect: , connect);
+    uint32_t connection_started = millis();
 
+    // while(millis() - connection_started < 5000 && attemptConnection(ssid, pwd) == P_CONNECTING) {
+    //   delay(100);
+    // }
+    // AsyncResponseStream *response = _request->beginResponseStream("application/json");
+    // _buildReport(connect, *response);
+    // _request->send(response);
     if (connect != P_CONNECTING){
       AsyncResponseStream *response = _request->beginResponseStream("application/json");
       _buildReport(connect, *response);
