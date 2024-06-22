@@ -1,4 +1,6 @@
 #include "PersWiFiManagerAsync.h"
+#include <ArduinoJson.h>
+#include <AsyncJson.h>
 
 #if defined(ESP32)
 #include <esp_wifi.h>
@@ -8,10 +10,19 @@
 typedef WiFiMode_t wifi_mode_t;
 #endif
 
-#ifdef WIFI_HTM_PROGMEM
+#ifdef PWMA_HTML_PROGMEM
 const char wifi_htm[] PROGMEM = R"=====(
 
 )=====";
+#endif
+
+#ifndef PWMA_LOG_DISABLE
+#define PWMA_LOG_PREFIX(m) #m
+#define PWMA_LOG(m) Serial.println(F("[PWMA] " m))
+#define PWMA_LOGF(m, v) Serial.printf(F(PWMA_LOG_PREFIX([PWMA] m %u)), v)
+#else
+#define PWMA_LOG(m)
+#define PWMA_LOGF(m, v)
 #endif
 
 PersWiFiManagerAsync::PersWiFiManagerAsync(AsyncWebServer &s, DNSServer &d) : _connectHandler(nullptr), _apHandler(nullptr), _apCloseHandler(nullptr)
@@ -58,9 +69,9 @@ pers_connection_t PersWiFiManagerAsync::attemptConnection(const String &ssid, co
       //   WiFi.mode(wifi_mode_t(WiFi.getMode() | WIFI_STA)); // Add Station Mode to connect to router
       // }
       WiFi.enableSTA(true);
-      Serial.println("[PWMA] Resetting settings");
+      PWMA_LOG("Resetting settings");
       resetSettings();                                     // To avoid issues (experience from WiFiManager)
-      Serial.println("[PWMA] Attempting connection");
+      PWMA_LOG("Attempting connection");
 
       if (pass.length()) {
         WiFi.begin(ssid.c_str(), pass.c_str());  
@@ -69,12 +80,12 @@ pers_connection_t PersWiFiManagerAsync::attemptConnection(const String &ssid, co
       }
     } else {
       if ((getSsid() == "") && (WiFi.status() != WL_CONNECTED)) { // No saved credentials, so skip trying to connect
-        Serial.println("[PWMA] No saved credentials. Starting AP");
+        PWMA_LOG("No saved credentials. Starting AP");
         startApMode();
         _connectionStatus = P_DISCONNECTED;
         return P_DISCONNECTED;
       } else {
-        Serial.println("[PWMA] Connecting to saved credentials");
+        PWMA_LOG("Connecting to saved credentials");
         // if (!(WiFi.getMode() & WIFI_STA))
         //   WiFi.mode(wifi_mode_t(WiFi.getMode() | WIFI_STA)); // Add Station Mode to connect to router
         WiFi.enableSTA(true);
@@ -88,9 +99,9 @@ pers_connection_t PersWiFiManagerAsync::attemptConnection(const String &ssid, co
   } else {
     if (millis() - _connectStartTime > (10000) && WiFi.status() != WL_CONNECTED) {
       // if (!(WiFi.getMode() & WIFI_AP)) {
-        Serial.println("[PWMA] Failed to connect. Starting AP");
-        WiFi.mode(WIFI_AP);
-        startApMode();
+      PWMA_LOG("Failed to connect. Starting AP");
+      WiFi.mode(WIFI_AP);
+      startApMode();
       // } else {
         // WiFi.mode(WIFI_AP); // Remove Station Mode if connecting to router failed
       // }
@@ -101,11 +112,11 @@ pers_connection_t PersWiFiManagerAsync::attemptConnection(const String &ssid, co
       return P_FAILED;
     } else {
       if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("[PWMA] Connected");
+        PWMA_LOG("Connected");
         _connectionStatus = P_SUCCESS;
         return P_SUCCESS;
       } else if (WiFi.status() == WL_CONNECT_FAILED) {
-        Serial.println("[PWMA] Failed to connect");
+        PWMA_LOG("Failed to connect");
         _connectionStatus = P_FAILED;
         return P_FAILED;
       }
@@ -121,7 +132,7 @@ void PersWiFiManagerAsync::handleWiFi()
     if (((WiFi.softAPgetStationNum() == 0) && (WiFi.status() == WL_CONNECTED) && (millis() - _apModeStartMillis > _apModeTimeoutMillis))
       || (_forceCloseAP && _connectSuccessTime && millis() - _connectSuccessTime > AP_FORCE_CLOSE_TIMEOUT)) 
     {
-      Serial.println("[PWMA] Closing AP");
+      PWMA_LOG("Closing AP");
       closeAp();
     }
   }
@@ -129,7 +140,7 @@ void PersWiFiManagerAsync::handleWiFi()
   if (_connectStartTime) {
     if (_connectRetryTime) {
       if (WiFi.status() != WL_CONNECTED && _apActive && !(getSsid() == "") && (millis() - _connectRetryTime > WIFI_RECONNECT_TIMEOUT)) {
-        Serial.println("[PWMA] Retrying connection");
+        PWMA_LOG("Retrying connection");
         attemptConnection();
         _connectRetryTime = millis();
       } 
@@ -198,7 +209,7 @@ void PersWiFiManagerAsync::closeAp()
 
 void PersWiFiManagerAsync::_buildReport(pers_connection_t status, Print &stream)
 {
-  DynamicJsonDocument doc(1024);
+  JsonDocument doc;
   switch (status){
     case P_CONNECTED:
       doc["status"] = "Connected";
@@ -286,8 +297,9 @@ void PersWiFiManagerAsync::setupWiFiHandlers()
     String pwd =  _request->arg("p");
     // pers_connection_t connect = attemptConnection(_request->arg("n"), _request->arg("p"));
     pers_connection_t connect = attemptConnection(ssid, pwd);
-    Serial.print("Connect:");
-    Serial.println(connect);
+    PWMA_LOGF(Connect:, connect);
+    // Serial.print("[PWMA] Connect:");
+    // Serial.println(connect);
 
     if (connect != P_CONNECTING){
       AsyncResponseStream *response = _request->beginResponseStream("application/json");
@@ -361,7 +373,7 @@ void PersWiFiManagerAsync::stop()
 // Remove the WiFi credentials (e.g. for testing purposes)
 void PersWiFiManagerAsync::resetSettings()
 {
-  Serial.println("[PWMA] Resetting");
+  PWMA_LOG("Resetting");
 #if defined(ESP8266)
   WiFi.disconnect();
 #elif defined(ESP32)

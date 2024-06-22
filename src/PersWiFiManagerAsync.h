@@ -6,12 +6,11 @@
 #elif defined(ESP32)
 #include <WiFi.h>
 #else
-#error "Unknown board class"
+#error "Unsupported MCU"
 #endif
+
 #include <ESPAsyncWebServer.h>
 #include <DNSServer.h>
-#include <ArduinoJson.h>
-#include <AsyncJson.h>
 
 #define WIFI_CONNECT_TIMEOUT 10000
 #define WIFI_RECONNECT_TIMEOUT 60000
