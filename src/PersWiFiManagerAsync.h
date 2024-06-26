@@ -14,7 +14,7 @@
 
 #define WIFI_CONNECT_TIMEOUT 10000
 #define WIFI_RECONNECT_TIMEOUT 60000
-#define AP_FORCE_CLOSE_TIMEOUT 10000
+#define AP_FORCE_CLOSE_TIMEOUT 30000
 
 typedef enum {
   P_DISCONNECTED  = 0,
@@ -22,6 +22,7 @@ typedef enum {
   P_CONNECTING    = 2,
   P_SUCCESS       = 3,
   P_FAILED        = 4,
+  P_NOCREDS       = 5,
 } pers_connection_t;
 
 class PersWiFiManagerAsync {
